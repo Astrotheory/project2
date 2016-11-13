@@ -1,0 +1,21 @@
+<html>
+<style>
+    body{
+      font-size: 15pt;
+      font-family: arial;
+    }
+  </style>
+
+<body>
+
+<h1>Merchants info</h1>
+
+<div>
+    {% for dish in dishes %}
+    <div>{{dish.name}}</div>
+    {% endfor %}
+</div>
+
+
+</body>
+</html>

@@ -38,7 +38,7 @@ app = Flask(__name__, template_folder=tmpl_dir)
 #     DATABASEURI = "postgresql://ewu2493:foobar@<IP_OF_POSTGRE_SQL_SERVER>/postgres"
 #
 # Swap out the URI below with the URI for the database created in part 2
-DATABASEURI = "sqlite:///test.db"
+DATABASEURI = "postgresql://qx2155:cj9sw@104.196.175.120/postgres"
 
 
 #
@@ -62,12 +62,6 @@ engine = create_engine(DATABASEURI)
 # 
 # The setup code should be deleted once you switch to using the Part 2 postgresql database
 #
-engine.execute("""DROP TABLE IF EXISTS test;""")
-engine.execute("""CREATE TABLE IF NOT EXISTS test (
-  id serial,
-  name text
-);""")
-engine.execute("""INSERT INTO test(name) VALUES ('grace hopper'), ('alan turing'), ('ada lovelace');""")
 #
 # END SQLITE SETUP CODE
 #
@@ -134,12 +128,13 @@ def index():
   #
   # example of a database query
   #
+  '''
   cursor = g.conn.execute("SELECT name FROM test")
   names = []
   for result in cursor:
     names.append(result['name'])  # can also be accessed using result[0]
   cursor.close()
-
+  '''
   #
   # Flask uses Jinja templates, which is an extension to HTML where you can
   # pass data to a template and dynamically generate HTML based on the data
@@ -165,15 +160,13 @@ def index():
   #     {% for n in data %}
   #     <div>{{n}}</div>
   #     {% endfor %}
-  #
-  context = dict(data = names)
 
 
   #
   # render_template looks in the templates/ folder for files.
   # for example, the below file reads template/index.html
   #
-  return render_template("index.html", **context)
+  return render_template("index.html")
 
 #
 # This is an example of a different path.  You can see it at
@@ -183,26 +176,93 @@ def index():
 # notice that the functio name is another() rather than index()
 # the functions for each app.route needs to have different names
 #
-@app.route('/another')
-def another():
-  return render_template("anotherfile.html")
 
-
+'''
 # Example of adding new data to the database
 @app.route('/add', methods=['POST'])
 def add():
   name = request.form['name']
   print name
   cmd = 'INSERT INTO test(name) VALUES (:name1), (:name2)';
-  g.conn.execute(text(cmd), name1 = name, name2 = name);
+  g.conn.execute(cmd, name1 = name, name2 = name);
   return redirect('/')
+'''
+
+# merchants index page, list all the dishes
+@app.route('/merchants/<uid>')
+def merchants_index(uid):
+  cur = g.conn.execute('SELECT name FROM Dishes WHERE uid = %d;', uid)
+  dishes = cur.fetchall()
+  cur.close()
+  return render_template("merchants_index.html", dishes=dishes)
+
+# dishes index page, list dish and reviews
+@app.route('/merchants/<uid>/dishes/<did>')
+def dishes_index(uid, did):
+  dish = g.conn.execute('SELECT * FROM Dishes WHERE did = %d;', did)
+  review = g.conn.execute('SELECT * FROM Reviews WHERE uid = %d AND did = %d;', uid, did)
+  dishes = dish.fetchall()
+  reviews = review.fetchall()
+  dishes.close()
+  reviews.close()
+  return render_template("dishes_index.html", dishes=dishes, reviews=reviews)
+
+# add dish
+@app.route('/merchants/<uid>/dishes/add', methods=['POST'])
+def add_dish(uid):
+  name = request.form['name']
+  description = request.form['description']
+  price = request.form['price']
+  category = request.form['category']
+  cur = g.conn.execute('SELECT cid FROM Categories WHERE name = %s;', category)
+  cid = cur.fetchone()
+  cmd = 'INSERT INTO Dishes(name, description, price, uid, cid) VALUES (%s, %s, %f, %d, %d);'
+  g.conn.execute(cmd, (name, description, price, uid, cid))
+  cur.close()
+  return render_template("add_dish.html")
+
+# update an existing dish
+@app.route('/merchants/<uid>/dishes/<did>/change', methods=['POST', 'GET'])
+def change_dish(uid, did):
+  description = request.form['description']
+  price = request.form['price']
+  cmd = 'UPDATE Dishes SET description = %s, price = %f WHERE uid = %d AND did = %d;'
+  g.conn.execute(cmd, (description, price, uid, did))
+  return render_template("change_dish.html")
+
+# add a review to an existing dish
+@app.route('/merchants/<uid>/dishes/<did>/reviews/add', methods=['POST'])
+def add_review(uid, did):
+  rev_time = request.form['rev_time']
+  rating = request.form['rating']
+  comment = request.form['comment']
+  cmd = 'INSERT INTO Reviews(uid, did, rev_time, rating, comment) VALUES (%d, %d, %s, %d, %s);'
+  g.conn.execute(cmd, (uid, did, rev_time, rating, comment))
+  return render_template("add_review.html")
+
+# delete a review
+@app.route('/merchants/<uid>/dishes/<did>/reviews/<rev_id>/delete', methods=['GET'])
+def delete_review(uid, did, rev_id):
+  cmd = 'DELETE FROM Reviews WHERE rev_id = %d;'
+  g.conn.execute(cmd, (rev_id))
+  return redirect('/merchants/<uid>/dishes/<did>', uid=uid, did=did)
+
+# add a category
+@app.route('/categories/add', methods=['POST'])
+def add_category():
+  name = request.form['name']
+  description = request.form['description']
+  cmd = 'INSERT INTO Categories(name, description) VALUES (%s, %s);'
+  g.conn.execute(cmd, (name, description))
+  return render_template("add_category.html")
 
 
+'''
 @app.route('/login')
 def login():
     abort(401)
     this_is_never_executed()
-
+'''
 
 if __name__ == "__main__":
   import click
